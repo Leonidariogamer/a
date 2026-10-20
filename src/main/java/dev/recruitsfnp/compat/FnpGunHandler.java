@@ -14,6 +14,7 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -32,6 +33,9 @@ public final class FnpGunHandler {
     private static final int OFFHAND = 1;
     private static boolean warned;
 
+    /** True while a recruit is inside a gun procedure; read by {@link RecoilGuard}. */
+    static volatile boolean running;
+
     public enum Result { NOTHING, LOADED, PRIMED, FIRED }
 
     private FnpGunHandler() {
@@ -48,14 +52,14 @@ public final class FnpGunHandler {
         }
         NonNullList<ItemStack> hands = ((MobAccessor) recruit).recruitsfnp$getHandItems();
         ItemStack savedOffhand = hands.get(OFFHAND);
+        boolean wasSneaking = recruit.isShiftKeyDown();
+        running = true;
         try {
             if (allowTrigger) {
                 hands.set(OFFHAND, ItemStack.EMPTY);
                 CompoundTag before = snapshot(gun);
                 if (invoke(execute, recruit, gun)) {
-                    boolean fired = before != null && before.getBoolean("gunpowderloaded")
-                            && !gun.getOrCreateTag().getBoolean("gunpowderloaded");
-                    return fired ? Result.FIRED : Result.PRIMED;
+                    return fired(recruit, before, gun) ? Result.FIRED : Result.PRIMED;
                 }
             }
             for (Candidate candidate : candidates(recruit)) {
@@ -65,10 +69,29 @@ public final class FnpGunHandler {
                     return Result.LOADED;
                 }
             }
+            if (FnpGuns.isMagazineGun(gun)) {
+                // Empty magazine: eject it so a fresh one can be inserted on the next step.
+                hands.set(OFFHAND, ItemStack.EMPTY);
+                recruit.setShiftKeyDown(true);
+                if (invoke(execute, recruit, gun)) {
+                    return Result.LOADED;
+                }
+            }
             return Result.NOTHING;
         } finally {
+            running = false;
+            recruit.setShiftKeyDown(wasSneaking);
             hands.set(OFFHAND, savedOffhand);
         }
+    }
+
+    /** A shot leaves a fresh projectile owned by the shooter; powder guns also clear their flag. */
+    private static boolean fired(AbstractRecruitEntity recruit, CompoundTag before, ItemStack gun) {
+        if (before != null && before.getBoolean("gunpowderloaded") && !gun.getOrCreateTag().getBoolean("gunpowderloaded")) {
+            return true;
+        }
+        return !recruit.level().getEntitiesOfClass(Projectile.class, recruit.getBoundingBox().inflate(3.0D),
+                p -> p.getOwner() == recruit && p.tickCount == 0).isEmpty();
     }
 
     private static boolean invoke(Method execute, AbstractRecruitEntity recruit, ItemStack gun) {

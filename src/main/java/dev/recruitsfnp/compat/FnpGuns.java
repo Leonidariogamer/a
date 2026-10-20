@@ -27,10 +27,42 @@ import org.slf4j.Logger;
 public final class FnpGuns {
     public static final String FNP = "flintnpowder";
 
-    /** Muzzle loaders that share the powder -> shot -> ramrod -> (prime) -> fire flow. */
-    private static final Set<String> GUN_IDS = Set.of(
-            "musket", "bayonet_musket", "rifle", "pistol", "arquebus",
-            "hand_gonne", "blunderbuss", "bruttbuss", "big_game", "flinter");
+    /**
+     * Gun registry path -> name of its right-click procedure class. Names are not uniform
+     * (BayonetMusketRightClickedProcedure, GasOperatedShotgunRightClickedProcedure...), so they are
+     * listed from the bytecode of each item's use() rather than guessed. Bayonet bolt action
+     * rifles share the bolt action rifle's procedure. The Log Cannon is left out: it is
+     * ignited with flint and steel and loaded from an inventory tick, not by hand.
+     */
+    private static final Map<String, String> GUN_PROCEDURES = Map.ofEntries(
+            // powder -> shot -> ramrod muzzle loaders
+            Map.entry("musket", "MusketRightclickedProcedure"),
+            Map.entry("bayonet_musket", "BayonetMusketRightClickedProcedure"),
+            Map.entry("rifle", "RifleRightclickedProcedure"),
+            Map.entry("pistol", "PistolRightclickedProcedure"),
+            Map.entry("arquebus", "ArquebusRightclickedProcedure"),
+            Map.entry("hand_gonne", "HandGonneRightclickedProcedure"),
+            Map.entry("blunderbuss", "BlunderbussRightclickedProcedure"),
+            Map.entry("bruttbuss", "BruttbussRightclickedProcedure"),
+            Map.entry("big_game", "BigGameRightclickedProcedure"),
+            Map.entry("flinter", "FlinterRightclickedProcedure"),
+            Map.entry("volleygun", "VolleygunRightClickedProcedure"),
+            // cartridge guns
+            Map.entry("bolt_action_rifle", "BoltActionRifleRightclickedProcedure"),
+            Map.entry("bayonet_bolt_action_rifle", "BoltActionRifleRightclickedProcedure"),
+            Map.entry("trapdoor_rifle", "TrapdoorRifleRightclickedProcedure"),
+            Map.entry("shotgun", "ShotgunRightclickedProcedure"),
+            Map.entry("break_action_coachgun", "BreakActionCoachgunRightclickedProcedure"),
+            Map.entry("single_action_revolver", "SingleActionRevolverRightclickedProcedure"),
+            // magazine guns
+            Map.entry("closed_bolt_mag_rifle", "ClosedBoltMagRifleRightclickedProcedure"),
+            Map.entry("blowback_handgun", "BlowbackHandgunRightclickedProcedure"),
+            Map.entry("open_bolt_smg", "OpenBoltSMGRightclickedProcedure"),
+            Map.entry("gas_operated_shotgun", "GasOperatedShotgunRightClickedProcedure"));
+
+    /** Magazine guns eject an empty magazine with a sneak + empty-hand click. */
+    private static final Set<String> MAGAZINE_GUNS = Set.of(
+            "closed_bolt_mag_rifle", "blowback_handgun", "open_bolt_smg", "gas_operated_shotgun");
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<Item, Optional<Method>> PROCEDURES = new ConcurrentHashMap<>();
@@ -61,15 +93,16 @@ public final class FnpGuns {
 
     private static Optional<Method> resolve(Item item) {
         ResourceLocation key = ForgeRegistries.ITEMS.getKey(item);
-        if (key == null || !FNP.equals(key.getNamespace()) || !GUN_IDS.contains(key.getPath())) {
+        if (key == null || !FNP.equals(key.getNamespace()) || !GUN_PROCEDURES.containsKey(key.getPath())) {
             return Optional.empty();
         }
         String itemClass = item.getClass().getName();
-        if (!itemClass.endsWith("Item") || !itemClass.contains(".item.")) {
+        int itemPackage = itemClass.lastIndexOf(".item.");
+        if (itemPackage < 0) {
             return Optional.empty();
         }
-        String base = itemClass.substring(0, itemClass.length() - "Item".length());
-        String procedureClass = base.replace(".item.", ".procedures.") + "RightclickedProcedure";
+        String procedureClass = itemClass.substring(0, itemPackage) + ".procedures."
+                + GUN_PROCEDURES.get(key.getPath());
         try {
             Class<?> type = Class.forName(procedureClass, true, item.getClass().getClassLoader());
             return Optional.of(type.getMethod("execute",
@@ -80,6 +113,14 @@ public final class FnpGuns {
                     key, procedureClass, e.toString());
             return Optional.empty();
         }
+    }
+
+    public static boolean isMagazineGun(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        ResourceLocation key = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        return key != null && FNP.equals(key.getNamespace()) && MAGAZINE_GUNS.contains(key.getPath());
     }
 
     private static String namespace(Item item) {

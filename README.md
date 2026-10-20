@@ -10,8 +10,13 @@ Requires Villager Recruits 1.15.x and Flint'N'Powder 1.0.0 (both on client and s
 2. Give it **gunpowder** and the gun's **shot** (round shot, buckshot, ...). A ramrod is optional by default.
 3. Let it fight. Between fights it reloads on its own.
 
-Supported guns (muzzle loaders): Musket, Bayonet Musket, Rifle, Pistol, Arquebus, Hand Gonne,
-Blunderbuss, Bruttbuss, Big Game, Flinter. Cartridge/magazine guns are not supported yet.
+Supported guns: every hand-held Flint'N'Powder gun except the Log Cannon.
+- Muzzle loaders (gunpowder, shot, ramrod): Musket, Bayonet Musket, Rifle, Pistol, Arquebus, Hand Gonne,
+  Blunderbuss, Bruttbuss, Big Game, Flinter, Volleygun.
+- Cartridge guns: Bolt Action Rifle (and bayonet version), Trapdoor Rifle, Shotgun, Break Action
+  Coachgun, Single Action Revolver. Give the recruit rifle rounds / shotgun shells / pistol rounds.
+- Magazine guns: Closed Bolt Mag Rifle, Blowback Handgun, Open Bolt SMG, Gas Operated Shotgun.
+  Give the recruit loaded magazines; an empty magazine is dropped when the gun runs dry.
 Settings are in `config/recruits_flintnpowder-common.toml`.
 
 ## How it works
